@@ -1,0 +1,548 @@
+Description:
+  David Essien
+  This template deploys the following components
+  - A VPC
+  - Internet gateway
+  - 2 Nat gateways
+  - 4 route tables
+  - 2 elastic ips
+  - 2 public subnets
+  - 2 private subnet and 1 public subnet
+  - An Autoscaling group
+  - A loadbalancer
+  - bastion host
+
+Parameters:
+  VPCName:
+    Description: Please enter the name of the VPC
+    Type: String
+    Default: Server Vpc
+  
+  VPCCIDR:
+    Description: Please enter the VPC CIDR
+    Type: String
+    Default: 10.0.0.0/16
+
+  PublicSubnet1Name:
+    Description: Please enter the name of public subnet1
+    Type: String
+    Default: Public Subnet1
+  
+  PublicSubnet1CIDR:
+    Description: Please enter the Public Subnet1 CIDR
+    Type: String
+    Default: 10.0.0.0/24
+
+  PublicSubnet2Name:
+    Description: Please enter the name of public subnet2
+    Type: String
+    Default: Public Subnet2
+  
+  PublicSubnet2CIDR:
+    Description: Please enter the Public Subne2t CIDR
+    Type: String
+    Default: 10.0.1.0/24
+
+  PrivateSubnet1Name:
+    Description: Please enter the name of the Private Subnet1
+    Type: String
+    Default: Private Subnet1
+
+  PrivateSubnet1CIDR:
+    Description: Please enter the private subnet1 CIDR
+    Type: String
+    Default: 10.0.2.0/24
+
+  PrivateSubnet2Name:
+    Description: Please enter the name of private subnet2
+    Type: String
+    Default: Private Subnet2
+
+  PrivateSubnet2CIDR:
+    Description: Please enter the private subnet2 CIDR
+    Type: String
+    Default: 10.0.3.0/24
+
+  InternetGatewayName:
+    Description: Please enter the name of the Internete gateway
+    Type: String
+    Default: Internet gateway
+  
+  NatElasticIP1Name:
+    Description: Please provide the name of the NAT Elastic IP 1
+    Type: String
+    Default: Nat Elastic IP1
+
+  NatElasticIP2Name:
+    Description: Please provide the name of the NAT Elastic IP 2
+    Type: String
+    Default: Nat Elastic IP2
+
+  NatGateway1Name:
+    Description: Please enter the NatGateway1 name
+    Type: String
+    Default: natgateway 1
+
+  NatGateway2Name:
+    Description: Please enter the NatGateway2 name
+    Type: String
+    Default: natgateway 2
+
+  BastionInstanceName:
+    Description: Please enter the Bastion instance name
+    Type: String
+    Default: Bastion Instance
+
+  LoadBalancerSecurityGroupName:
+    Description: Please enter the name of the loadbalancer security group
+    Type: String
+    Default: LB Security group
+
+  LoadBalancerTargetGroupName:
+    Description: Please enter the name of the loadbalancer target group
+    Type: String
+    Default: LB Target group
+
+  PrivateInstanceSecurityGroupName:
+    Description: Please enter the name of the private instances security group
+    Type: String
+    Default: private instances Security group
+
+  KeyPair:
+    Description: The keypair for the autoscaling group
+    Type: String
+    Default: server_keypair
+
+
+Resources:
+  # VPC
+  VPC: 
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCIDR
+      EnableDnsHostnames: true
+      Tags: 
+        - Key: Name 
+          Value: !Ref VPCName
+
+  # Internet gateway
+  InternetGateway:
+      Type: AWS::EC2::InternetGateway
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Ref InternetGatewayName
+
+  # Internet gateway attachment          
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  # Public Routing      
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      Tags: 
+        - Key: Name
+          Value: "Public Route Table"
+      VpcId: !Ref VPC
+    DependsOn: InternetGatewayAttachment
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  # public subnets
+  PublicSubnet1: 
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags: 
+        - Key: Name 
+          Value: !Ref PublicSubnet1Name   
+
+  PublicSubnet2: 
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags: 
+        - Key: Name 
+          Value: !Ref PublicSubnet2Name
+
+  # Public route tables association
+  AssociatePUBRT1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  AssociatePUBRT2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+  # NAT GATEWAY
+  ElasticIP1:
+    Type: AWS::EC2::EIP
+    Properties:
+        Tags:
+        - Key: Name
+          Value: !Ref NatElasticIP1Name
+  
+  ElasticIP2:
+    Type: AWS::EC2::EIP
+    Properties:
+        Tags:
+        - Key: Name
+          Value: !Ref NatElasticIP2Name
+
+  NatGateway1:
+    Type: AWS::EC2::NatGateway
+    Properties:
+        AllocationId: !GetAtt ElasticIP1.AllocationId
+        SubnetId: !Ref PublicSubnet1
+        Tags:
+        - Key: Name
+          Value: !Ref NatGateway1Name
+
+  NatGateway2:
+    Type: AWS::EC2::NatGateway
+    Properties:
+        AllocationId: !GetAtt ElasticIP2.AllocationId
+        SubnetId: !Ref PublicSubnet2
+        Tags:
+        - Key: Name
+          Value: !Ref NatGateway2Name
+  
+  # Private Routing
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      Tags: 
+        - Key: Name
+          Value: "Private Route Table1"
+      VpcId: !Ref VPC
+
+  PrivateRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      Tags: 
+        - Key: Name
+          Value: "Private Route Table2"
+      VpcId: !Ref VPC
+
+  PrivateRoute1:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
+
+  PrivateRoute2:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway2
+
+  PrivateSubnet1: 
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      MapPublicIpOnLaunch: false
+      Tags: 
+        - Key: Name 
+          Value: !Ref PrivateSubnet1Name
+
+  PrivateSubnet2: 
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags: 
+        - Key: Name 
+          Value: !Ref PrivateSubnet2Name
+
+  AssociatePRIVRT1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet1
+
+  AssociatePRIVRT2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref PrivateRouteTable2
+      SubnetId: !Ref PrivateSubnet2
+  
+  # Bastion security group
+  BastionSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    DependsOn: InternetGateway
+    Properties:
+      GroupDescription: Allow http and ssh traffic
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Ref BastionInstanceName
+
+  BastionInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0729e439b6769d6ab
+      KeyName: !Ref KeyPair
+      InstanceType: t2.micro
+      SubnetId: !Ref PublicSubnet1
+      SecurityGroupIds:
+        - !Ref BastionSecGroup
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-BastionInstance'
+  
+  # Loadbalancer security group
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    DependsOn: InternetGateway
+    Properties:
+      GroupDescription: Allow http traffic for the load balancer
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Ref LoadBalancerSecurityGroupName
+  
+  # Loadbalancer target group
+  ServerTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 8
+      HealthyThresholdCount: 2
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 5
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Ref LoadBalancerTargetGroupName
+
+  # Loadbalancer listener rule
+  ServerLBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn:
+          Ref: ServerTargetGroup
+      LoadBalancerArn:
+        Ref: ServerLB
+      Port: '80'
+      Protocol: HTTP  
+
+  # Autoscaling group load balancer
+  ServerLB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application
+      Subnets:
+      - !Ref PublicSubnet1
+      - !Ref PublicSubnet2
+      SecurityGroups:
+      - Ref: LoadBalancerSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-Load balancer'
+
+  # Security group for instances
+  PrivateInstancesSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    DependsOn: InternetGateway
+    Properties:
+      GroupDescription: Open HTTP (port 80)
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        SourceSecurityGroupId: !Ref BastionSecGroup
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Ref PrivateInstanceSecurityGroupName
+      
+
+  # Launch configuration
+  ServerLaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          sudo apt-get update -y
+          sudo apt-get install apache2 -y
+          cd /var/www/html/
+          rm index.html
+          wget https://raw.githubusercontent.com/davidshare/profile-page/master/index.html
+          wget https://raw.githubusercontent.com/davidshare/profile-page/master/index.css
+          mkdir images
+          wget https://github.com/davidshare/profile-page/raw/master/images/david-essien.png -P images
+          sudo systemctl start apache2.service       
+      ImageId: ami-0729e439b6769d6ab
+      SecurityGroups:
+      - Ref: PrivateInstancesSecurityGroup
+      InstanceType: t3.small 
+      BlockDeviceMappings:
+      - DeviceName: "/dev/sdk"
+        Ebs:
+          VolumeSize: '10'
+
+  ServerAutoscalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier:
+      - !Ref PrivateSubnet1
+      - !Ref PrivateSubnet2
+      LaunchConfigurationName:
+        Ref: ServerLaunchConfig
+      MinSize: '4'
+      MaxSize: '10'
+      TargetGroupARNs:
+      - Ref: ServerTargetGroup
+
+  # scale policies
+  ServerScaleUpPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref ServerAutoscalingGroup
+      Cooldown: '60'
+      ScalingAdjustment: 1
+
+  ServerScaleDownPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref ServerAutoscalingGroup
+      Cooldown: '300'
+      ScalingAdjustment: -1
+
+# cloud watch
+  CPUAlarmHigh:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Scale-up if CPU > 80% for 5 minutes
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      AlarmActions: [!Ref ServerScaleUpPolicy]
+      Dimensions:
+      - Name: AutoScalingGroupName
+        Value: !Ref ServerAutoscalingGroup
+      ComparisonOperator: GreaterThanThreshold
+
+  CPUAlarmLow:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Scale-down if CPU < 60% for 5 minutes
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      AlarmActions: [!Ref ServerScaleDownPolicy]
+      Dimensions:
+      - Name: AutoScalingGroupName
+        Value: !Ref ServerAutoscalingGroup
+      ComparisonOperator: LessThanThreshold
+    
+
+Outputs:
+  VPCIDOutput: 
+    Description: The output for the created VPC ID
+    Value: !Ref VPC
+    Export:
+      Name: VPCID
+
+  PublicSubnet1Output:
+    Description: The output of the public subnet1 id
+    Value: !Ref PublicSubnet1
+    Export:
+      Name: PublicSubnet1Id
+
+  PublicSubnet2Output:
+    Description: The output of the public subnet2 id
+    Value: !Ref PublicSubnet2
+    Export:
+      Name: PublicSubnet2Id
+
+  PrivateSubnet1Output:
+    Description: The output of the private subnet1 id
+    Value: !Ref PrivateSubnet1
+    Export:
+      Name: PrivateSubnet1Id
+
+  PrivateSubnet2Output: 
+    Description: The output of the private subnet1 id
+    Value: !Ref PrivateSubnet2
+    Export:
+      Name: PrivateSubnet2Id
+
+  PrivateSubnets:
+    Description: Output of the IDs for the private subnets
+    Value: !Join [ ",", [ !Ref PrivateSubnet1, !Ref PrivateSubnet2 ]]
+    Export:
+      Name: PrivateSubnets
+
+  BastionHostDNS:
+    Description: Bastion host public DNS
+    Value: !GetAtt BastionInstance.PublicDnsName
+    
+  BastionPublicIPAddress:
+    Description: Bastion host public IP
+    Value: !GetAtt BastionInstance.PublicIp
+  
+  LoadBalancerUrl:
+    Description: The URL of the ALB
+    Value: !Join ['', ['http://', !GetAtt [ServerLB, DNSName]]]
