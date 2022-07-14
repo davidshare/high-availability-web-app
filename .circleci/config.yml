@@ -18,6 +18,15 @@ jobs:
       - image: circleci/node:13.8.0
     steps:
       - run: echo "world"
+
+  test_env_vars:
+    docker:
+      - image: cimg/base:2021.04
+        environment:
+          NAME: "David Essien"
+    steps:
+      - run echo "my name is $NAME"
+
 workflows:
   # Name the workflow "welcome"
   welcome:
@@ -28,3 +37,4 @@ workflows:
       - print_world:
           requires:
             - print_hello
+      - test_env_vars
