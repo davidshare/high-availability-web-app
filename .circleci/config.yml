@@ -25,7 +25,7 @@ jobs:
         environment:
           NAME: "David Essien"
     steps:
-      - run echo "my name is $NAME"
+      - run: echo "my name is $NAME"
 
 workflows:
   # Name the workflow "welcome"
