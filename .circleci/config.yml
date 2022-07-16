@@ -54,6 +54,12 @@ workflows:
       - print_world:
           requires:
             - print_hello
-      - test_env_vars
-      - save_hello_world_output
-      - print_output_file
+      - test_env_vars:
+          requires:
+            - print_world
+      - save_hello_world_output:
+          requires:
+            - test_env_vars
+      - print_output_file:
+          requires:
+            - save_hello_world_output
