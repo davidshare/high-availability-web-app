@@ -48,7 +48,6 @@ jobs:
 workflows:
   # Name the workflow "welcome"
   welcome:
-    # Run the welcome/run job in its own container
     jobs:
       - welcome/run
       - print_hello
@@ -58,4 +57,3 @@ workflows:
       - test_env_vars
       - save_hello_world_output
       - print_output_file
-      
