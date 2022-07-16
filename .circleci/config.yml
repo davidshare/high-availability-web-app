@@ -26,6 +26,24 @@ jobs:
           NAME: "David Essien"
     steps:
       - run: echo "my name is $NAME"
+  
+  save_hello_world_output:
+    docker:
+      - image: circleci/node:13.8.0
+    steps:
+      - run: echo "text to output here" > output.txt
+    persist_to_workspace:
+      root: /tmp/workspace
+      paths:
+        - output.txt
+  
+  print_output_file:
+    steps:
+      - attach_workspace:
+            at: /tmp/workspace
+        - run:
+            command: |
+              cat output.txt
 
 workflows:
   # Name the workflow "welcome"
@@ -38,3 +56,5 @@ workflows:
           requires:
             - print_hello
       - test_env_vars
+      - save_hello_world_output
+      - print_output_file
