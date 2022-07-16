@@ -30,20 +30,19 @@ jobs:
   save_hello_world_output:
     docker:
       - image: circleci/node:13.8.0
-    working_directory: /workspace
     steps:
       - run: echo "text to output here" > output.txt
       - persist_to_workspace:
-          root: /workspace
+          root: .
           paths:
-            - output.txt
+            - .
   
   print_output_file:
     docker:
       - image: circleci/node:13.8.0
     steps:
       - attach_workspace:
-          at: /workspace
+          at: .
       - run: cat output.txt
 
 workflows:
