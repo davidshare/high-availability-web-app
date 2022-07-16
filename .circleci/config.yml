@@ -59,6 +59,16 @@ jobs:
     steps:
       - print_pipeline_id
 
+  failing:
+    docker:
+      - image: cimg/base:2021.04
+    steps:
+      - run: exit 1
+      - run:
+          name: on error
+          command: echo "Hello Error!"
+          when: on_fail
+
 workflows:
   # Name the workflow "welcome"
   welcome:
@@ -80,4 +90,5 @@ workflows:
       - get_pipeline_id:
           requires:
             - print_output_file
+      - failing
 
