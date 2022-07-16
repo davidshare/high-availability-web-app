@@ -40,10 +40,8 @@ jobs:
   print_output_file:
     steps:
       - attach_workspace:
-            at: /tmp/workspace
-        - run:
-            command: |
-              cat output.txt
+        at: /tmp/workspace
+      - run: cat output.txt
 
 workflows:
   # Name the workflow "welcome"
